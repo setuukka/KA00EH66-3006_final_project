@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
+from datetime import datetime, date, time
 
 #Option to text just python part, excluding streamlit code
 lit = True
@@ -28,42 +29,52 @@ df.rename(columns = {'Price': 'price', 'kWh' : 'kwh','Temperature' : 'temperatur
 
 #Forming hourly rate from price and Kwh per hour
 df['total_price'] = df['price'] * df['kwh']
+df['date'] = df['timestamp'].dt.date
+df['week_year'] = df['timestamp'].dt.strftime('%U/%Y')
+df['month'] = df['timestamp'].dt.strftime('%m/%Y')
 
-""" #Forming date and month columns so we can aggregate values later
-df['day'] = pd.to_datetime(df['timestamp']).dt.date
-df['month'] = df['timestamp'].dt.to_period('M')
-
-
-#Forming new dfs to show hourly, daily and monthly values
-df_hourly = df.groupby(['timestamp'], as_index = False).agg({'Price' : 'mean', 'kWh' : 'sum', 'Temperature' : 'mean'})
-df_daily = df.groupby(['day'], as_index= False).agg({'Price' : 'mean', 'kWh' : 'sum', 'Temperature' : 'mean'})
-df_monthly = df.groupby(['month'], as_index= False).agg({'Price' : 'mean', 'kWh' : 'sum', 'Temperature' : 'mean'})
-
-#Renaming columns to match hourly, daily and monthly data
-df_hourly.rename(columns = {'Price' : 'mean_price', 'kWh' : 'total_kwh', 'Temperature' : 'mean_temperature', 'timestamp': 'hour'}, inplace = True)
-df_daily.rename(columns = {'Price' : 'mean_price', 'kWh' : 'total_kwh', 'Temperature' : 'mean_temperature'}, inplace = True)
-df_monthly.rename(columns = {'Price' : 'mean_price', 'kWh' : 'total_kwh', 'Temperature' : 'mean_temperature'}, inplace = True)
-
-#Forming total_consumption column to all dataframes
-df_hourly['total_consumption'] = df_hourly['mean_price'] * df_hourly['total_kwh']
-
-df_daily['total_consumption'] = df_daily['mean_price'] * df_daily['total_kwh']
-df_monthly['total_consumption'] = df_monthly['mean_price'] * df_daily['total_kwh'] """
-
+#print(df)
 
 if lit:
 
-    option = st.selectbox(
+    start_date = st.date_input("Start date",
+                  df['timestamp'].min())
+    start_date = pd.to_datetime(start_date)
+
+    if start_date < df['timestamp'].min():
+        start_date = df['timestamp'].min()
+        st.write(f"Do not choose date before {df['date'].min()}")
+
+    end_date = st.date_input("End date",
+                  df['timestamp'].max())
+    
+    end_date = pd.to_datetime(end_date)   
+    if end_date > df['timestamp'].max():
+        end_date = df['timestamp'].max()
+        st.write(f"Do not choose date after {df['date'].max()}")
+
+    df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+
+    #st.write(df)
+
+    option = st.radio(
         "Choose time interval",
-        ['Hourly','Daily','Monthly']
+        ['Hourly','Daily','Monthly','Weekly']
     )
 
     if option == 'Daily':
-        grouped_df = df.groupby(df['timestamp'].dt.date).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
+        grouped_df = df.groupby(df['date']).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
+        #grouped_df = df.groupby(df['date']).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
 
     elif option == 'Monthly':
-        grouped_df = df.groupby(df['timestamp'].dt.to_period('M')).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
+        #grouped_df = df.groupby(df['timestamp'].dt.to_period('M')).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
+        grouped_df = df.groupby(df['month']).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
         
+    elif option == 'Weekly':
+        grouped_df = df.groupby(df['week_year']).agg({'price': 'mean', 'kwh' : 'sum', 'temperature' : 'mean', 'total_price' : 'sum'})
+
+    
+    
     else:
         grouped_df = df
 
